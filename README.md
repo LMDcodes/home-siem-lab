@@ -85,8 +85,8 @@ docker exec single-node-wazuh.manager-1 /var/ossec/bin/agent_control -l
 
 ## Hardening TODO (before this ever touches a real network)
 
-- [ ] Rotate the Wazuh `admin` / indexer password (not just the compose file — re-run the
-      indexer security admin tool so the change takes effect).
+- [x] Rotate the Wazuh `admin` / indexer password (done 2026-11-10 — new hash applied to the
+      indexer security index via `securityadmin.sh`; verified and durable across restarts).
 - [ ] Rotate the Wazuh API password (`API_PASSWORD`).
 - [ ] Restrict the dashboard to localhost only (don't publish :443 on `0.0.0.0` if remote).
 - [ ] Replace the self-signed certs if accessed beyond localhost.

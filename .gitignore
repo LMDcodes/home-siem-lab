@@ -8,3 +8,4 @@ wazuh-agent-pkg/
 passlist.txt
 # macOS
 .DS_Store
+credentials.local.txt
