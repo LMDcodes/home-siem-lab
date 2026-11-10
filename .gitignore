@@ -1,0 +1,10 @@
+# Third-party Wazuh compose clone (has generated TLS certs/secrets)
+wazuh-docker/
+# Downloaded agent binary
+wazuh-agent-pkg/
+# Secrets / certs
+*.pem
+*.key
+passlist.txt
+# macOS
+.DS_Store
