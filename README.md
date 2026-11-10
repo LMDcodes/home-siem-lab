@@ -37,6 +37,8 @@ and triage the resulting alerts — all on hardware too small for a full multi-V
 - **Endpoint 1:** the Mac itself — Wazuh macOS agent (ID 001), pointed at `localhost`.
 - **Endpoint 2:** Ubuntu Server 24.04.5 ARM64 in UTM (ID 002, host `dml`, `192.168.64.2`),
   with `wazuh-agent` + `auditd` + OpenSSH. Reaches the manager at the Mac's UTM-network IP `192.168.64.1`.
+- **Honeypot:** Cowrie SSH honeypot on `localhost:2222` with its own Wazuh agent (`cowrie-honeypot`)
+  and custom MITRE-mapped rules. See [cowrie-honeypot/README.md](cowrie-honeypot/README.md).
 - **Attack box:** the Mac (replaces a Kali VM there's no RAM for), using `nmap` and `hydra`,
   plus Atomic Red Team running *on* the Ubuntu endpoint.
 
@@ -97,6 +99,7 @@ docker exec single-node-wazuh.manager-1 /var/ossec/bin/agent_control -l
 .
 ├── README.md                       # this file
 ├── incident-report-2026-11-10.md   # attack simulation + triage write-up
+├── cowrie-honeypot/                 # Cowrie SSH honeypot + Wazuh agent + detection rules
 └── wazuh-docker/                    # official compose + generated certs (single-node/)
 ```
 

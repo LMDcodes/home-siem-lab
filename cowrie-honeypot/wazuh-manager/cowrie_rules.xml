@@ -1,0 +1,140 @@
+<!--
+  Cowrie SSH honeypot rules for Wazuh 4.x
+  Events arrive as JSON (agent localfile log_format=json), so the built-in
+  json decoder exposes Cowrie fields directly: eventid, src_ip, username,
+  password, input, url, shasum, session, version, ...
+  Custom rule ID range: 100500-100599.
+
+  Anything that touches a honeypot is suspicious by definition, so levels
+  are higher than equivalent rules on a production host.
+-->
+<group name="cowrie,honeypot,">
+
+  <!-- Parent: any Cowrie event -->
+  <rule id="100500" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="eventid">^cowrie\.</field>
+    <description>Cowrie honeypot event.</description>
+  </rule>
+
+  <!-- ===== Connection / session ===== -->
+  <rule id="100501" level="4">
+    <if_sid>100500</if_sid>
+    <field name="eventid">^cowrie\.session\.connect$</field>
+    <description>Cowrie: new SSH connection from $(src_ip).</description>
+    <mitre><id>T1595</id></mitre>
+    <group>connection,</group>
+  </rule>
+
+  <rule id="100502" level="3">
+    <if_sid>100500</if_sid>
+    <field name="eventid">^cowrie\.client\.version$</field>
+    <description>Cowrie: SSH client $(version) from $(src_ip).</description>
+  </rule>
+
+  <rule id="100503" level="2">
+    <if_sid>100500</if_sid>
+    <field name="eventid">^cowrie\.session\.closed$</field>
+    <description>Cowrie: session $(session) from $(src_ip) closed.</description>
+  </rule>
+
+  <!-- ===== Authentication ===== -->
+  <rule id="100510" level="5">
+    <if_sid>100500</if_sid>
+    <field name="eventid">^cowrie\.login\.failed$</field>
+    <description>Cowrie: failed login as '$(username)' from $(src_ip).</description>
+    <mitre><id>T1110</id></mitre>
+    <group>authentication_failed,</group>
+  </rule>
+
+  <rule id="100511" level="10" frequency="8" timeframe="120">
+    <if_matched_sid>100510</if_matched_sid>
+    <same_field>src_ip</same_field>
+    <description>Cowrie: SSH brute force from $(src_ip) (8+ failed logins in 2 min).</description>
+    <mitre><id>T1110.001</id></mitre>
+    <group>authentication_failures,</group>
+  </rule>
+
+  <rule id="100512" level="10">
+    <if_sid>100500</if_sid>
+    <field name="eventid">^cowrie\.login\.success$</field>
+    <description>Cowrie: attacker logged in as '$(username)' from $(src_ip).</description>
+    <mitre><id>T1078</id></mitre>
+    <group>authentication_success,</group>
+  </rule>
+
+  <rule id="100513" level="12" timeframe="600">
+    <if_sid>100512</if_sid>
+    <if_matched_sid>100511</if_matched_sid>
+    <same_field>src_ip</same_field>
+    <description>Cowrie: brute force from $(src_ip) succeeded (login as '$(username)').</description>
+    <mitre><id>T1110.001</id><id>T1078</id></mitre>
+  </rule>
+
+  <!-- ===== Post-login commands ===== -->
+  <rule id="100520" level="7">
+    <if_sid>100500</if_sid>
+    <field name="eventid">^cowrie\.command\.input$</field>
+    <description>Cowrie: command from $(src_ip): $(input)</description>
+    <mitre><id>T1059.004</id></mitre>
+  </rule>
+
+  <rule id="100521" level="8">
+    <if_sid>100520</if_sid>
+    <field name="input" type="pcre2">(?i)\b(uname|whoami|id|nproc|lscpu|free|last|hostname)\b|/proc/(cpuinfo|meminfo|version)|/etc/(passwd|shadow|os-release|issue)</field>
+    <description>Cowrie: system discovery from $(src_ip): $(input)</description>
+    <mitre><id>T1082</id><id>T1033</id></mitre>
+  </rule>
+
+  <rule id="100522" level="12">
+    <if_sid>100520</if_sid>
+    <field name="input" type="pcre2">(?i)\b(wget|curl|tftp|ftpget|scp)\b</field>
+    <description>Cowrie: tool transfer attempt from $(src_ip): $(input)</description>
+    <mitre><id>T1105</id></mitre>
+  </rule>
+
+  <rule id="100523" level="12">
+    <if_sid>100520</if_sid>
+    <field name="input" type="pcre2">(?i)authorized_keys|crontab|/etc/cron|\.bashrc|/etc/rc\.local|systemctl\s+enable</field>
+    <description>Cowrie: persistence attempt from $(src_ip): $(input)</description>
+    <mitre><id>T1098.004</id><id>T1053.003</id></mitre>
+  </rule>
+
+  <rule id="100524" level="12">
+    <if_sid>100520</if_sid>
+    <field name="input" type="pcre2">(?i)xmrig|minerd|stratum\+tcp|cryptonight|nicehash</field>
+    <description>Cowrie: cryptominer activity from $(src_ip): $(input)</description>
+    <mitre><id>T1496</id></mitre>
+  </rule>
+
+  <rule id="100525" level="10">
+    <if_sid>100520</if_sid>
+    <field name="input" type="pcre2">(?i)history\s+-c|rm\s+-rf\s+/var/log|unset\s+HISTFILE|>\s*/var/log/</field>
+    <description>Cowrie: anti-forensics from $(src_ip): $(input)</description>
+    <mitre><id>T1070.003</id></mitre>
+  </rule>
+
+  <!-- ===== Files ===== -->
+  <rule id="100530" level="12">
+    <if_sid>100500</if_sid>
+    <field name="eventid">^cowrie\.session\.file_download$</field>
+    <description>Cowrie: attacker downloaded $(url) (sha256 $(shasum)) from $(src_ip).</description>
+    <mitre><id>T1105</id></mitre>
+  </rule>
+
+  <rule id="100531" level="12">
+    <if_sid>100500</if_sid>
+    <field name="eventid">^cowrie\.session\.file_upload$</field>
+    <description>Cowrie: attacker uploaded file (sha256 $(shasum)) from $(src_ip).</description>
+    <mitre><id>T1105</id></mitre>
+  </rule>
+
+  <!-- ===== Tunnelling ===== -->
+  <rule id="100540" level="8">
+    <if_sid>100500</if_sid>
+    <field name="eventid">^cowrie\.direct-tcpip\.</field>
+    <description>Cowrie: SSH port-forward / proxy attempt from $(src_ip) to $(dst_ip):$(dst_port).</description>
+    <mitre><id>T1090</id></mitre>
+  </rule>
+
+</group>

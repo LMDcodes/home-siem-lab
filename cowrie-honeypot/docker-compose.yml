@@ -1,0 +1,55 @@
+# Cowrie SSH honeypot + dedicated Wazuh agent that ships Cowrie's JSON log
+# to the existing single-node Wazuh manager.
+#
+# Start the Wazuh stack first (wazuh-docker/single-node), then:
+#   docker compose up -d
+services:
+  cowrie:
+    image: cowrie/cowrie:latest
+    restart: unless-stopped
+    # Bound to localhost by default so the honeypot is not exposed to your LAN.
+    # Set COWRIE_BIND=0.0.0.0 in .env to let the Ubuntu VM (192.168.64.x) attack it.
+    ports:
+      - "${COWRIE_BIND:-127.0.0.1}:${COWRIE_PORT:-2222}:2222"
+    volumes:
+      - ./cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - ./cowrie/userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
+      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie
+      - cowrie-downloads:/cowrie/cowrie-git/var/lib/cowrie/downloads
+    networks:
+      - honeynet
+    mem_limit: 256m
+    # Least privilege: the honeypot is the thing attackers touch.
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+  wazuh-agent:
+    image: wazuh/wazuh-agent:4.14.1
+    # The official agent image is built for amd64; Docker Desktop runs it via Rosetta on Apple Silicon.
+    platform: linux/amd64
+    hostname: cowrie-honeypot
+    restart: unless-stopped
+    environment:
+      - WAZUH_MANAGER_SERVER=${WAZUH_MANAGER:-wazuh.manager}
+      - WAZUH_AGENT_NAME=cowrie-honeypot
+    volumes:
+      - ./wazuh-agent/ossec.conf:/wazuh-config-mount/etc/ossec.conf:ro
+      - cowrie-logs:/cowrie-logs:ro
+    networks:
+      - wazuh
+    mem_limit: 256m
+    depends_on:
+      - cowrie
+
+networks:
+  # Cowrie lives on its own network and cannot reach the Wazuh containers.
+  honeynet:
+  # The single-node stack's default network (compose project "single-node").
+  wazuh:
+    external: true
+    name: ${WAZUH_NETWORK:-single-node_default}
+
+volumes:
+  cowrie-logs:
+  cowrie-downloads:

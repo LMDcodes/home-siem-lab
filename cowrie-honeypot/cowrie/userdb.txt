@@ -1,0 +1,12 @@
+# Cowrie fake credentials: user:uid:password  (! = deny, * = any)
+# Deny the most obvious ones so brute-forcers have to keep trying (more alerts),
+# then let a few common weak passwords "succeed" so you see post-login activity.
+root:x:!root
+root:x:!toor
+root:x:!123456
+root:x:!password
+root:x:admin123
+root:x:P@ssw0rd
+admin:x:admin
+ubuntu:x:ubuntu
+pi:x:raspberry
